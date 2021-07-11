@@ -31,6 +31,7 @@ static int invincibleTextureId = TEXTURE_INVALID_ID;
 static int damageTextureId = TEXTURE_INVALID_ID;
 static int purgeTextureId = TEXTURE_INVALID_ID;
 static int notifyUFOTextureId = TEXTURE_INVALID_ID;
+static int blockGuide = TEXTURE_INVALID_ID;
 static Player player;
 static int  playerTextureVertical = 0;
 
@@ -43,7 +44,10 @@ void BlockDecision();
 void ToFreeFlyingObject(FlyingObject& flyingObject);
 void UpdatePutFlyingObject();
 bool IsOverlaped(FlyingObject& flyingObject);
+bool IsOverlaped(const INTVECTOR2& flyingObject);
 void MoveAdjust();
+void DrawBlockGuide(const D3DXVECTOR2& pos, const D3DXVECTOR2& dir);
+void DrawBlockGuideFourDirections(const D3DXVECTOR2& pos);
 
 void InitPlayer() {
 	textureId = ReserveTextureLoadFile("texture/player/player_64×64.png");
@@ -53,6 +57,7 @@ void InitPlayer() {
 	purgeTextureId = ReserveTextureLoadFile("texture/player/player_nekopunch_64×64.png");
 	putPredictionTextureId = ReserveTextureLoadFile("texture/player/putPrediction.png");
 	notifyUFOTextureId = ReserveTextureLoadFile("texture/player/akan.png");
+	blockGuide = ReserveTextureLoadFile("texture/player/blockGuide.png");
 
 	getItemMessage = new Message(D3DXVECTOR2(2, 2));
 	getItemMessage->SetFormat(DT_CENTER | DT_NOCLIP);
@@ -87,6 +92,7 @@ void UninitPlayer() {
 	ReleaseTexture(damageTextureId);
 	ReleaseTexture(purgeTextureId);
 	ReleaseTexture(notifyUFOTextureId);
+	ReleaseTexture(blockGuide);
 }
 
 void UpdatePlayer() {
@@ -192,6 +198,15 @@ void DrawPlayer() {
 
 	for (auto itr = player.purgeFlyingObjectList.begin(); itr != player.purgeFlyingObjectList.end(); itr++) {
 		DrawFlyingObject(*itr);
+	}
+
+	//ブロックガイド表示
+	if (player.blockMax != player.flyingObjectList.size()) {
+		DrawBlockGuideFourDirections(player.trans.pos);
+
+		for (auto& flyingObject : player.flyingObjectList) {
+			DrawBlockGuideFourDirections(flyingObject.trans.pos);
+		}
 	}
 
 
@@ -337,6 +352,33 @@ void UpdatePutFlyingObject() {
 	}
 }
 
+void DrawBlockGuide(const D3DXVECTOR2& pos, const D3DXVECTOR2& dir) {
+	if (IsOverlaped(INTVECTOR2(pos))) {
+		return;
+	}
+	auto p = pos;
+	p.x -= 0.5f;
+	p.y -= 0.5f;
+	auto d = D3DXVECTOR2(-1, 0);
+	auto dr = D3DXVec2Dot(&d, &dir);
+	if (dr > 1) {
+		dr = 1;
+	}
+	if (dr < -1) {
+		dr = -1;
+	}
+	auto rad = acosf(dr);
+	if (d.x * dir.y - d.y * dir.x < 0) {
+		rad = -rad;
+	}
+	DrawGameSprite(blockGuide, p, 50, { 1,1 }, { 0,0 }, { 32,32 }, {0.5,0.5},rad);
+}
+void DrawBlockGuideFourDirections(const D3DXVECTOR2& pos) {
+	DrawBlockGuide(D3DXVECTOR2(pos.x+1, pos.y),D3DXVECTOR2(1,0));
+	DrawBlockGuide(D3DXVECTOR2(pos.x, pos.y+1),D3DXVECTOR2(0,1));
+	DrawBlockGuide(D3DXVECTOR2(pos.x-1, pos.y),D3DXVECTOR2(-1,0));
+	DrawBlockGuide(D3DXVECTOR2(pos.x, pos.y-1),D3DXVECTOR2(0,-1));
+}
 
 void RotateLeftPlayer() {
 
@@ -564,9 +606,12 @@ bool GetBlock(FlyingObject& itr, D3DXVECTOR2& attachPos) {
 	return true;
 }
 bool IsOverlaped(FlyingObject& flyingObject) {
-	return flyingObject.trans.GetIntPos() == player.trans.GetIntPos() ||
-		find_if(player.flyingObjectList.begin(), player.flyingObjectList.end(), [&flyingObject](FlyingObject f) {
-		return f.trans.GetIntPos() == flyingObject.trans.GetIntPos();
+	return IsOverlaped(flyingObject.trans.GetIntPos());
+}
+bool IsOverlaped(const INTVECTOR2& pos) {
+	return pos == player.trans.GetIntPos() ||
+		find_if(player.flyingObjectList.begin(), player.flyingObjectList.end(), [&pos](FlyingObject f) {
+		return f.trans.GetIntPos() == pos;
 			}) != player.flyingObjectList.end();
 }
 
